@@ -23,7 +23,7 @@ class weather_location:
 
 
 ##########################################################################################################
-##  FUNCTIONS FOR READING TEST DATA FROM A CSV FILE AND CREATING A LIST OF CLASS OBJECTS FROM DATA ROWS  ##
+##  FUNCTIONS FOR READING TEST DATA FROM A CSV FILE AND CREATING A LIST OF CLASS OBJECTS FROM DATA ROWS ##
 ##########################################################################################################
 
 def get_class(class_name: str):

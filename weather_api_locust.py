@@ -141,7 +141,7 @@ def _(environment, **kw):
 
         fail = fail or new_fail
 
-    if (fail):
+    if fail:
         for msg in fail_msg_list:
             logging.error(msg)
         environment.process_exit_code = 1
