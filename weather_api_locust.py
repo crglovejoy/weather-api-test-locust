@@ -2,7 +2,8 @@ import random
 import logging
 import gevent
 
-from locust import HttpUser, between, task
+from pathlib import Path
+from locust import HttpUser, between, task, events
 from threading import Lock
 from data_source import load_csv_and_return_list_of_class_objects, weather_location
 
@@ -15,9 +16,10 @@ from data_source import load_csv_and_return_list_of_class_objects, weather_locat
 class Weather(HttpUser):
     wait_time = between(2, 5)
     host = "https://api.weather.gov/points/"
-    weather_coordinates_list = []
+    weather_coordinates_list = list[weather_location]
     weather_coordinates_list_len = 0
     get_weather_coordiantes_lock = Lock()
+
 
 
     ######################################
@@ -31,7 +33,7 @@ class Weather(HttpUser):
                     if self.weather_coordinates_list_len == 0:
                         self.weather_coordinates_list = load_csv_and_return_list_of_class_objects(
                             "weather_location", 
-                            "<path_needed>\\weather_loc_input.csv", 
+                            f"{Path.cwd()}\\weather_loc_input.csv", 
                             True
                         )
                         self.weather_coordinates_list_len = len(self.weather_coordinates_list)
@@ -51,7 +53,7 @@ class Weather(HttpUser):
         new_loc: weather_location = self.weather_coordinates_list[random.randint(0, self.weather_coordinates_list_len - 1)]
 
         with self.client.get(
-            f"{new_loc.latitude},{new_loc.longitude}", 
+            f"{new_loc.latitude},{new_loc.longitude}",
             name=f"request_{new_loc.city.lower()}_{new_loc.state.lower()}", 
             catch_response=True
         ) as response:
@@ -81,9 +83,9 @@ class Weather(HttpUser):
             return None, None
 
 
-    #############################
-    ##  Test Stoppage Methods  ##
-    #############################
+    ######################################
+    ##  Test Stoppage on Error Methods  ##
+    ######################################
         
     def stop_the_test_on_except(self, e: Exception):
         logging.exception({e})
@@ -95,5 +97,58 @@ class Weather(HttpUser):
             handler.flush()
         gevent.sleep(0.5)
         self.environment.runner.quit()
+
+
+######################################
+##  TEST RESULT THRESHOLD ANALYSIS  ##
+######################################
+
+def handle_greater_than_err_checking_and_return_fail_bool(fail_msg_list: list[str], context_name: str, metric: str, val: float, threshold: float) -> bool:
+    if val > threshold:
+        fail_msg_list.append(f"Test failed because {context_name} {metric} was too high: {val} > {threshold}")
+        return True
+    return False
+
+
+@events.quitting.add_listener
+def _(environment, **kw):
+    fail: bool = False
+    fail_msg_list: list[str] = []
+
+    if environment.stats.total.num_requests == 0:
+        fail_msg_list.append(f"Test failed due to 0 requests being made")
+        fail = True
+
+    fail = fail or handle_greater_than_err_checking_and_return_fail_bool(fail_msg_list, "total failure %", "total.fail_ratio", environment.stats.total.fail_ratio, 0.01)
+
+    for (name, method), stats_entry in environment.stats.entries.items():
+        new_fail = False
+        if name == "request_allen_tx":
+            new_fail = handle_greater_than_err_checking_and_return_fail_bool(fail_msg_list, name, "avg_response_time", stats_entry.avg_response_time, 60)
+        elif name == "request_bemidji_mn":
+            new_fail = handle_greater_than_err_checking_and_return_fail_bool(fail_msg_list, name, "avg_response_time", stats_entry.avg_response_time, 60)
+        elif name == "request_burlington_vt":
+            new_fail = handle_greater_than_err_checking_and_return_fail_bool(fail_msg_list, name, "avg_response_time", stats_entry.avg_response_time, 80)
+        elif name == "request_linn_ks":
+            new_fail = handle_greater_than_err_checking_and_return_fail_bool(fail_msg_list, name, "avg_response_time", stats_entry.avg_response_time, 60)
+        elif name == "request_oxford_ms":
+            new_fail = handle_greater_than_err_checking_and_return_fail_bool(fail_msg_list, name, "avg_response_time", stats_entry.avg_response_time, 85)
+        elif name == "request_oxnard_ca":
+            new_fail = handle_greater_than_err_checking_and_return_fail_bool(fail_msg_list, name, "avg_response_time", stats_entry.avg_response_time, 65)
+        else:
+            new_fail = True
+            fail_msg_list.append(f"{name} is not implemented for avg_response_time analysis")
+
+        fail = fail or new_fail
+
+    if (fail):
+        for msg in fail_msg_list:
+            logging.error(msg)
+        environment.process_exit_code = 1
+    else:
+        logging.info("All threshold analysis PASSED")
+        environment.process_exit_code = 0
+
+
 
         
