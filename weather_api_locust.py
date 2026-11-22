@@ -1,6 +1,7 @@
 import random
 import logging
 import gevent
+import os
 
 from pathlib import Path
 from locust import HttpUser, between, task, events
@@ -33,7 +34,7 @@ class Weather(HttpUser):
                     if self.weather_coordinates_list_len == 0:
                         self.weather_coordinates_list = load_csv_and_return_list_of_class_objects(
                             "weather_location", 
-                            f"{Path.cwd()}\\weather_loc_input.csv", 
+                            f"{Path.cwd()}{os.path.sep}weather_loc_input.csv", 
                             True
                         )
                         self.weather_coordinates_list_len = len(self.weather_coordinates_list)
