@@ -125,9 +125,9 @@ def _(environment, **kw):
     for (name, method), stats_entry in environment.stats.entries.items():
         new_fail = False
         if name == "request_allen_tx":
-            new_fail = handle_greater_than_err_checking_and_return_fail_bool(fail_msg_list, name, "avg_response_time", stats_entry.avg_response_time, 60)
+            new_fail = handle_greater_than_err_checking_and_return_fail_bool(fail_msg_list, name, "avg_response_time", stats_entry.avg_response_time, 3)
         elif name == "request_bemidji_mn":
-            new_fail = handle_greater_than_err_checking_and_return_fail_bool(fail_msg_list, name, "avg_response_time", stats_entry.avg_response_time, 60)
+            new_fail = handle_greater_than_err_checking_and_return_fail_bool(fail_msg_list, name, "avg_response_time", stats_entry.avg_response_time, 3)
         elif name == "request_burlington_vt":
             new_fail = handle_greater_than_err_checking_and_return_fail_bool(fail_msg_list, name, "avg_response_time", stats_entry.avg_response_time, 80)
         elif name == "request_linn_ks":
