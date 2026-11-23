@@ -120,17 +120,15 @@ avg_response_thresholds_dict: dict[str, float] = {
 }
 
 @events.quitting.add_listener
-def _(environment, **kw):
-    fail: bool = False
+def on_quitting(environment, **kw):
     fail_msg_list: list[str] = []
 
     # make sure we had request stats to analyze
     if environment.stats.total.num_requests == 0:
         fail_msg_list.append(f"Test failed due to 0 requests being made")
-        fail = True
     else:
         # check the overall failure rate
-        fail = fail or handle_greater_than_err_checking_and_return_fail_bool(
+        handle_greater_than_err_checking_and_return_fail_bool(
             fail_msg_list, 
             "total failure %", 
             "total.fail_ratio", 
@@ -144,10 +142,9 @@ def _(environment, **kw):
             thresh_val = avg_response_thresholds_dict.pop(name, None)
 
             if not thresh_val:
-                fail = True
                 fail_msg_list.append(f"{name} does not have a avg_respose_time threshold defined")
             else:
-                fail = fail or handle_greater_than_err_checking_and_return_fail_bool(
+                handle_greater_than_err_checking_and_return_fail_bool(
                     fail_msg_list,
                     name,
                     "avg_response_time",
@@ -157,10 +154,9 @@ def _(environment, **kw):
 
         # anything left in the dictionary means we did not encounter the key/name in the stats
         for key in avg_response_thresholds_dict.keys():
-            fail = True
             fail_msg_list.append(f"Did not find an instance of {key} in the results to do threshold analysis")
 
-    if fail:
+    if len(fail_msg_list) > 0:
         for msg in fail_msg_list:
             logging.error(msg)
         environment.process_exit_code = 1
