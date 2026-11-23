@@ -110,37 +110,55 @@ def handle_greater_than_err_checking_and_return_fail_bool(fail_msg_list: list[st
         return True
     return False
 
+avg_response_thresholds_dict: dict[str, float] = {
+    "request_allen_tx": 60,
+    "request_bemidji_mn": 60,
+    "request_burlington_vt": 80,
+    "request_linn_ks": 60,
+    "request_oxford_ms": 85,
+    "request_oxnard_ca": 65
+}
 
 @events.quitting.add_listener
 def _(environment, **kw):
     fail: bool = False
     fail_msg_list: list[str] = []
 
+    # make sure we had request stats to analyze
     if environment.stats.total.num_requests == 0:
         fail_msg_list.append(f"Test failed due to 0 requests being made")
         fail = True
+    else:
+        # check the overall failure rate
+        fail = fail or handle_greater_than_err_checking_and_return_fail_bool(
+            fail_msg_list, 
+            "total failure %", 
+            "total.fail_ratio", 
+            environment.stats.total.fail_ratio, 
+            0.01
+        )
 
-    fail = fail or handle_greater_than_err_checking_and_return_fail_bool(fail_msg_list, "total failure %", "total.fail_ratio", environment.stats.total.fail_ratio, 0.01)
+        # check the avg response time for each request name against the threshold value
+        # contained in the avg_response_thresholds_dict dictionary.
+        for (name, method), stats_entry in environment.stats.entries.items():
+            thresh_val = avg_response_thresholds_dict.pop(name, None)
 
-    for (name, method), stats_entry in environment.stats.entries.items():
-        new_fail = False
-        if name == "request_allen_tx":
-            new_fail = handle_greater_than_err_checking_and_return_fail_bool(fail_msg_list, name, "avg_response_time", stats_entry.avg_response_time, 60)
-        elif name == "request_bemidji_mn":
-            new_fail = handle_greater_than_err_checking_and_return_fail_bool(fail_msg_list, name, "avg_response_time", stats_entry.avg_response_time, 60)
-        elif name == "request_burlington_vt":
-            new_fail = handle_greater_than_err_checking_and_return_fail_bool(fail_msg_list, name, "avg_response_time", stats_entry.avg_response_time, 80)
-        elif name == "request_linn_ks":
-            new_fail = handle_greater_than_err_checking_and_return_fail_bool(fail_msg_list, name, "avg_response_time", stats_entry.avg_response_time, 60)
-        elif name == "request_oxford_ms":
-            new_fail = handle_greater_than_err_checking_and_return_fail_bool(fail_msg_list, name, "avg_response_time", stats_entry.avg_response_time, 85)
-        elif name == "request_oxnard_ca":
-            new_fail = handle_greater_than_err_checking_and_return_fail_bool(fail_msg_list, name, "avg_response_time", stats_entry.avg_response_time, 65)
-        else:
-            new_fail = True
-            fail_msg_list.append(f"{name} is not implemented for avg_response_time analysis")
+            if not thresh_val:
+                fail = True
+                fail_msg_list.append(f"{name} does not have a avg_respose_time threshold defined")
+            else:
+                fail = fail or handle_greater_than_err_checking_and_return_fail_bool(
+                    fail_msg_list,
+                    name,
+                    "avg_response_time",
+                    stats_entry.avg_response_time,
+                    thresh_val
+                )
 
-        fail = fail or new_fail
+        # anything left in the dictionary means we did not encounter the key/name in the stats
+        for key in avg_response_thresholds_dict.keys():
+            fail = True
+            fail_msg_list.append(f"Did not find an instance of {key} in the results to do threshold analysis")
 
     if fail:
         for msg in fail_msg_list:
